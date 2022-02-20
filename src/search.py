@@ -17,6 +17,12 @@ class Search(object):
             parsed_page = BeautifulSoup(data.text, "html.parser")
             return parsed_page
 
+        def has_results(self, parsed_page):
+            find_alert_box = parsed_page.find("div", {"class": "alert alert-block"})
+            if find_alert_box is None:
+                return True
+            return False
+
         def splice_data(self, data):
             spliced_data = data.split(", ")
             city = spliced_data[0]
@@ -27,7 +33,18 @@ class Search(object):
             return [city, state, postal_code]
 
         def filter_parsed_data(self, data):
-            filtered_businesses = data.find_all("tr")
+            queried_businesses = data.find_all("tr")
+            
+            # Always want to pop the first one as this just displays Business Name, this will error out the code if not properly filtered.
+            queried_businesses.pop(0)
+
+            # To get rid of the unwanted Trademarks, Brands, Assumed names etc.. 
+            filtered_businesses = []
+            for query in queried_businesses:
+                filtered_business = query.find_all("div", {"class": "col-md-4"})[1].get_text()
+                if "Domestic" in filtered_business or "Foreign" in filtered_business:
+                    filtered_businesses.append(query)
+
             businesses = []
             for business in filtered_businesses:
                 context = {}
@@ -55,6 +72,8 @@ class Search(object):
                             header = item.find("dt").get_text()
                             value = item.find("dd").get_text()
 
+                            #if header == "Business Type" and ("Domestic" in value or "Foreign" in value):
+                            
                             # This is to format the address before pushing it off into the context.
                             if "Registered Office Address" in header or "Principal Executive Office Address" in header:
                                 value = item.find("dd")
@@ -69,24 +88,32 @@ class Search(object):
                                 if num_breaks == 2:
                                     if "#" in address_data[0]:
                                         split_data = address_data[0].split("#")
-                                        address["line1"] = split_data[0]
+                                        address["line1"] = split_data[0].title()
                                         address["line2"] = "#{}".format(split_data[1])             
+                                    elif "Suite" in address_data[0]:
+                                        split_data = address_data[0].split("Suite")
+                                        address["line1"] = split_data[0].title()
+                                        address["line2"] = "Suite {}".format(split_data[1])
+                                    elif "Ste" in address_data[0]:
+                                        split_data = address_data[0].split("Ste")
+                                        address["line1"] = split_data[0].title()
+                                        address["line2"] = "Ste {}".format(split_data[1])
                                     else:
-                                        address["line1"] = address_data[0]
+                                        address["line1"] = address_data[0].title()
                                         address["line2"] = None
                                     
                                     data = self.splice_data(address_data[1])
-                                    address["city"] = data[0]
+                                    address["city"] = data[0].title()
                                     address["state"] = data[1]
                                     address["postal_code"] = data[2]
                                     
                                 
                                 if num_breaks == 3:
-                                    address["line1"] = address_data[0]
+                                    address["line1"] = address_data[0].title()
                                     address["line2"] = address_data[1]
 
                                     data = self.splice_data(address_data[2])
-                                    address["city"] = data[0]
+                                    address["city"] = data[0].title()
                                     address["state"] = data[1]
                                     address["postal_code"] = data[2]
                                 
@@ -97,18 +124,25 @@ class Search(object):
                             match header:
                                 case "Filing Date": context["filing_date"] = value
                                 case "Registered Office Address": context["registered_office_address"] = value
-                                case header if "Officer" in header or "Manager" in header: context["officer"] = value
+                                case header if "Officer" in header or "Manager" in header: context["officer"] = value.title()
                                 case "Status": context["status"] = value
                                 case "Principal Executive Office Address": context["principal_address"] = value
                             
                             context["state"] = "Minnesota"
 
                 businesses.append(context)
+
             return businesses
 
         def query_response(self, search_query):
             url = self.construct_query_url(search_query)
             response = requests.get(url)
+
             parsed_page = self.parse_data(response)
-            filtered_data = self.filter_parsed_data(parsed_page)
-            return filtered_data
+            has_results = self.has_results(parsed_page)
+
+            if response.status_code == 200 and has_results:
+                filtered_data = self.filter_parsed_data(parsed_page)
+                return filtered_data
+            else:
+                return None
