@@ -25,11 +25,16 @@ class Search(object):
 
         def splice_data(self, data):
             spliced_data = data.split(", ")
-            city = spliced_data[0]
-            # Splice data down further to get the state, and postal code
-            spliced_data = spliced_data[1].split(" ")
-            state = spliced_data[0]
-            postal_code = spliced_data[1]
+            try:
+                city = spliced_data[0].title()
+                # Splice data down further to get the state, and postal code
+                spliced_data = spliced_data[1].split(" ")
+                state = spliced_data[0]
+                postal_code = spliced_data[1]
+            except IndexError:
+                city = None
+                state = None
+                postal_code = None
             return [city, state, postal_code]
 
         def filter_parsed_data(self, data):
@@ -55,6 +60,7 @@ class Search(object):
                     This is to handle the name case execeptions because querying this site can sometimes throw a NoneType error.
                     """
                     context["business_name"] = name.get_text()
+                    print(context["business_name"])
 
                 extracted_url = business.find("a")
                 if extracted_url != None:
@@ -103,7 +109,7 @@ class Search(object):
                                         address["line2"] = None
                                     
                                     data = self.splice_data(address_data[1])
-                                    address["city"] = data[0].title()
+                                    address["city"] = data[0]
                                     address["state"] = data[1]
                                     address["postal_code"] = data[2]
                                     
@@ -113,7 +119,7 @@ class Search(object):
                                     address["line2"] = address_data[1]
 
                                     data = self.splice_data(address_data[2])
-                                    address["city"] = data[0].title()
+                                    address["city"] = data[0]
                                     address["state"] = data[1]
                                     address["postal_code"] = data[2]
                                 
@@ -133,7 +139,7 @@ class Search(object):
 
             return businesses
 
-        def query_response(self, search_query):
+        def query(self, search_query):
             url = self.construct_query_url(search_query)
             response = requests.get(url)
 
