@@ -127,8 +127,7 @@ class Search(object):
                                 case header if "Officer" in header or "Manager" in header: context["officer"] = value.title()
                                 case "Status": context["status"] = value
                                 case "Principal Executive Office Address": context["principal_address"] = value
-                            
-                            context["state"] = "Minnesota"
+                                case "Home Jurisdiction": context["home_jurisdiction"] = value
 
                 businesses.append(context)
 
